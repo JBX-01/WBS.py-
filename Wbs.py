@@ -6,7 +6,7 @@ import networkx as nx
 # Configuration de la page
 st.set_page_config(page_title="WBS Dynamique avec Branches", layout="wide")
 
-st.title("Structure de Découpage du Travail (WBS) avec Branches")
+st.title("Structure de Découpage du Travail (WBS) avec Branches et Rectangles")
 
 # Initialisation du DataFrame pour stocker les données du WBS
 if "wbs_data" not in st.session_state:
@@ -49,57 +49,80 @@ else:
     st.info("Ajoutez des tâches pour afficher le WBS.")
 
 # Création du graphique WBS avec des branches
-st.subheader("Diagramme WBS avec Branches")
+st.subheader("Diagramme WBS avec Rectangles et Branches")
 
 # Création du graphe pour représenter les branches du WBS
 if not st.session_state["wbs_data"].empty:
-    # Initialisation du graphique NetworkX
-    G = nx.DiGraph()
-    
-    # Ajouter des noeuds (tâches) et des arêtes (dépendances)
+    # Initialisation du graphique Plotly
+    fig = go.Figure()
+
+    # Coordonnées pour positionner les rectangles
+    x_offset = 0  # Décalage horizontal pour chaque phase
+    y_offset = 0  # Décalage vertical pour chaque tâche
+
+    # Créer des rectangles pour les phases (Planification, Exécution, Contrôle)
+    phases = ["Planification", "Exécution", "Contrôle"]
+    for i, phase in enumerate(phases):
+        # Ajouter un rectangle pour chaque phase
+        fig.add_trace(go.Scatter(
+            x=[x_offset, x_offset + 4, x_offset + 4, x_offset],
+            y=[y_offset + 1, y_offset + 1, y_offset, y_offset],
+            fill='toself',
+            fillcolor='lightblue',
+            line=dict(color='black'),
+            text=phase,
+            mode="text+lines",
+            textposition="middle center",
+            name=phase
+        ))
+        y_offset -= 2  # Diminuer la position verticale pour la prochaine phase
+        x_offset += 5  # Déplacer horizontalement pour la phase suivante
+
+    # Ajouter les tâches sous les phases
     for _, row in st.session_state["wbs_data"].iterrows():
-        G.add_node(row["Tâche"], label=row["Tâche"])
-        if row["Parent"] != "Aucune":
-            G.add_edge(row["Parent"], row["Tâche"])
+        parent_phase = row["Phase"]
+        task_name = row["Tâche"]
+        # Ajuster la position en fonction de la phase
+        if parent_phase == "Planification":
+            y_pos = 0
+        elif parent_phase == "Exécution":
+            y_pos = -2
+        else:
+            y_pos = -4
+        
+        # Créer un rectangle pour chaque tâche
+        fig.add_trace(go.Scatter(
+            x=[x_offset, x_offset + 3, x_offset + 3, x_offset],
+            y=[y_pos + 0.5, y_pos + 0.5, y_pos - 0.5, y_pos - 0.5],
+            fill='toself',
+            fillcolor='lightgreen',
+            line=dict(color='black'),
+            text=task_name,
+            mode="text+lines",
+            textposition="middle center",
+            name=task_name
+        ))
 
-    # Générer une mise en page hiérarchique
-    pos = nx.spring_layout(G, seed=42)
+        # Relier la tâche à la phase par une ligne
+        fig.add_trace(go.Scatter(
+            x=[x_offset + 1.5, x_offset + 1.5],
+            y=[y_pos, y_pos + 1],  # Relier la tâche à la phase
+            mode="lines",
+            line=dict(color='black', width=2),
+            showlegend=False
+        ))
 
-    # Créer une figure Plotly
-    trace = go.Scatter(
-        x=[pos[node][0] for node in G.nodes()],
-        y=[pos[node][1] for node in G.nodes()],
-        mode='markers+text',
-        text=[node for node in G.nodes()],
-        textposition='top center',
-        marker=dict(size=12, color='skyblue', line=dict(width=2)),
-    )
+        y_pos -= 1  # Placer la prochaine tâche sous celle-ci
 
-    # Créer les liens entre les tâches avec des flèches
-    edge_trace = go.Scatter(
-        x=[],
-        y=[],
-        line=dict(width=0.5, color='#888'),
-        hoverinfo='none',
-        mode='lines'
-    )
-    
-    for edge in G.edges():
-        x0, y0 = pos[edge[0]]
-        x1, y1 = pos[edge[1]]
-        edge_trace['x'] += (x0, x1, None)
-        edge_trace['y'] += (y0, y1, None)
-    
-    # Créer la figure Plotly avec noeuds et arêtes
-    layout = go.Layout(
+    # Configuration de la mise en page
+    fig.update_layout(
         showlegend=False,
-        hovermode='closest',
-        title="WBS avec Branches",
-        xaxis=dict(showgrid=False, zeroline=False),
-        yaxis=dict(showgrid=False, zeroline=False),
+        title="WBS avec Rectangles et Branches",
+        xaxis=dict(showgrid=False, zeroline=False, range=[0, 12]),
+        yaxis=dict(showgrid=False, zeroline=False, range=[-6, 1]),
+        plot_bgcolor="white"
     )
 
-    fig = go.Figure(data=[edge_trace, trace], layout=layout)
     st.plotly_chart(fig)
 else:
-    st.info("Ajoutez des tâches pour générer le diagramme WBS avec branches.")
+    st.info("Ajoutez des tâches pour générer le diagramme WBS avec rectangles et branches.")
